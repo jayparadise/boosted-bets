@@ -1,0 +1,6 @@
+{
+  "functions": { "api/*.js": { "maxDuration": 60 } },
+  "headers": [
+    { "source": "/(.*)", "headers": [ { "key": "X-Frame-Options", "value": "DENY" }, { "key": "Cache-Control", "value": "no-store" } ] }
+  ]
+}

@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>bet365 Import</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --ink:#1a1d23; --muted:#6b7280; --line:#e5e7eb; --accent:#2563eb; --ok:#15803d; --okbg:#ecfdf3; --warn:#b45309; --warnbg:#fffbeb; --bad:#b91c1c; --badbg:#fef2f2; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; color:var(--ink); background:var(--bg); }
+  header { display:flex; align-items:center; gap:16px; padding:12px 20px; background:var(--card); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:5; }
+  header h1 { font-size:16px; margin:0; }
+  header .sp { flex:1; }
+  main { max-width:1180px; margin:0 auto; padding:16px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:14px; }
+  .card h2 { font-size:15px; margin:0 0 10px; display:flex; align-items:center; gap:10px; }
+  .step { display:inline-flex; width:22px; height:22px; border-radius:50%; background:var(--accent); color:#fff; font-size:12px; align-items:center; justify-content:center; }
+  button { font:inherit; padding:7px 14px; border-radius:7px; border:1px solid var(--line); background:#fff; cursor:pointer; }
+  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  input[type=text], input[type=password], select { font:inherit; padding:6px 8px; border:1px solid var(--line); border-radius:6px; background:#fff; }
+  .muted { color:var(--muted); }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .drop { border:2px dashed #cbd5e1; border-radius:10px; padding:26px; text-align:center; color:var(--muted); cursor:pointer; }
+  .drop.over { border-color:var(--accent); background:#eff6ff; }
+  .chip { display:inline-block; padding:3px 9px; border-radius:999px; font-size:12px; border:1px solid var(--line); margin:2px 4px 2px 0; }
+  .chip.ok { background:var(--okbg); color:var(--ok); border-color:#bbf7d0; }
+  .chip.miss { background:#f3f4f6; color:var(--muted); }
+  .chip.warn { background:var(--warnbg); color:var(--warn); border-color:#fde68a; }
+  .chip.bad { background:var(--badbg); color:var(--bad); border-color:#fecaca; }
+  table { border-collapse:collapse; width:100%; font-size:13px; }
+  th, td { padding:4px 6px; border-bottom:1px solid var(--line); text-align:left; white-space:nowrap; }
+  th { color:var(--muted); font-weight:600; font-size:12px; }
+  td.num { text-align:right; font-variant-numeric:tabular-nums; }
+  tr.exact { }
+  tr.fuzzy td, tr.token td { background:var(--warnbg); }
+  tr.none td { background:var(--badbg); }
+  tr.alias td, tr.manual td { background:#eff6ff; }
+  tr.skip td { background:#f3f4f6; color:var(--muted); }
+  .game { border:1px solid var(--line); border-radius:8px; margin-bottom:10px; }
+  .game .hd { display:flex; gap:10px; align-items:center; padding:8px 10px; background:#f9fafb; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  .game .hd strong { font-size:14px; }
+  .game .body { padding:0 10px 8px; max-height:420px; overflow:auto; }
+  .game.collapsed .body { display:none; }
+  .badge { font-size:11px; padding:2px 7px; border-radius:5px; background:#eef2ff; color:#3730a3; }
+  .badge.complete { background:var(--okbg); color:var(--ok); }
+  .badge.nodata { background:#f3f4f6; color:var(--muted); }
+  .err { color:var(--bad); }
+  .ok { color:var(--ok); }
+  progress { width:100%; height:10px; }
+  #toast { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:#111827; color:#fff; padding:10px 16px; border-radius:8px; display:none; z-index:10; }
+  .hidden { display:none !important; }
+  .legend span { margin-right:10px; }
+  .sw { display:inline-block; width:12px; height:12px; border:1px solid var(--line); vertical-align:-2px; margin-right:3px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>bet365 → Data Entry import</h1>
+  <span class="muted" id="who"></span>
+  <span class="sp"></span>
+  <a href="https://claude.ai/artifact/PUrbuwDwJK5dzGWgx84GTE" target="_blank" rel="noopener" id="btnHelp" class="hidden" style="text-decoration:none"><button type="button">Instructions</button></a>
+  <button id="btnMap" class="hidden">Name Mapping</button>
+  <button id="btnRuns" class="hidden">Recent imports</button>
+  <button id="btnLogout" class="hidden">Log out</button>
+</header>
+<main>
+  <section class="card" id="loginCard">
+    <h2>Team password</h2>
+    <form id="loginForm" class="row">
+      <input type="password" id="p" placeholder="team password" autocomplete="current-password" required>
+      <button class="primary" type="submit">Continue</button>
+      <span id="loginErr" class="err"></span>
+    </form>
+    <p class="muted" style="margin:10px 0 0">Remembered on this browser for 30 days. Saves go into the data-entry app under the shared import account.</p>
+  </section>
+
+  <section class="card hidden" id="leagueCard">
+    <h2><span class="step">1</span> League</h2>
+    <div class="row">
+      <select id="league"><option value="">loading…</option></select>
+      <button id="btnRefresh">Refresh fixtures</button>
+      <span id="leagueInfo" class="muted"></span>
+    </div>
+    <div id="fixtures" style="margin-top:10px"></div>
+  </section>
+
+  <section class="card hidden" id="filesCard">
+    <h2><span class="step">2</span> bet365 saves</h2>
+    <p class="muted" style="margin:0 0 10px">On each bet365 tab (Shots, Shots On Target, Tackles, Score or Assist, To Be Booked) press <b>Ctrl+S → "Webpage, Complete"</b>, then drop the .html files here. Files are read in your browser; only the extracted prices are sent on.</p>
+    <div class="drop" id="drop">Drop .html files here or click to choose</div>
+    <input type="file" id="fileInput" accept=".html,.htm" multiple class="hidden">
+    <div id="tabs" style="margin-top:10px"></div>
+    <div id="fileErr" class="err"></div>
+    <div class="row" style="margin-top:10px">
+      <label title="Unchecked: only empty cells are filled and values already in the app are kept. Checked: every matched player's values are replaced with the bet365 values."><input type="checkbox" id="optOverwrite"> Overwrite values already in the app</label>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button id="btnMatch" class="primary" disabled>Continue →</button>
+      <button id="btnClearFiles">Clear files</button>
+    </div>
+  </section>
+
+  <section class="card hidden" id="reviewCard">
+    <h2><span class="step">3</span> Import</h2>
+    <p class="muted" style="margin:0 0 10px">Players are matched to the app rosters automatically (exact name or unambiguous partial name). Anything else is skipped and listed in the result. Games are marked completed only when every tab the league uses was provided (Tackles are not used for Eredivisie, Libertadores, Ligue 1, MLS, Liga MX, Primeira Liga and Süper Lig).</p>
+    <p id="modeNote" style="margin:0 0 10px"></p>
+    <div class="row">
+      <button id="btnRun" class="primary">Import now</button>
+      <span id="runNote" class="muted"></span>
+    </div>
+  </section>
+
+  <section class="card hidden" id="runCard">
+    <h2><span class="step">4</span> Result</h2>
+    <progress id="prog" value="0" max="1"></progress>
+    <div id="runStatus" class="muted" style="margin:6px 0"></div>
+    <div id="report"></div>
+  </section>
+
+  <section class="card hidden" id="mapCard">
+    <h2>Name Mapping <button id="btnMapClose" style="margin-left:auto">close</button></h2>
+    <p class="muted" style="margin:0 0 10px">bet365 names that recent imports could not match. Pick the data-entry player once and every future import uses it. Choose <i>ignore</i> for players who are not in the app (they stop being reported as skipped).</p>
+    <div class="row" style="margin-bottom:10px"><select id="mapLeague"></select><span id="mapInfo" class="muted"></span></div>
+    <div id="mapUnmatched"></div>
+    <h3 style="font-size:14px;margin:18px 0 6px">Existing mappings</h3>
+    <div id="mapExisting"></div>
+  </section>
+
+  <section class="card hidden" id="runsCard">
+    <h2>Recent imports <button id="btnRunsClose" style="margin-left:auto">close</button></h2>
+    <div class="row" style="margin-bottom:10px"><input type="text" id="findName" placeholder="find a player, e.g. Gonzalo Garcia" style="width:280px"><select id="findLeague"><option value="">all leagues</option></select><button id="btnFind">Search uploads</button><span id="findInfo" class="muted"></span></div>
+    <div id="findResults"></div>
+    <div id="runsList"></div>
+  </section>
+</main>
+<div id="toast"></div>
+
+<script type="module">
+import { FIELDS, FIELD_LABELS, TABS, parseBet365Html, buildRows, norm, makeResolver, matchFixture, same } from './lib.js';
+
+const $ = id => document.getElementById(id);
+const S = { protected: false, serviceUser: null, leagues: [], league: '', fixtures: [], files: {}, rows: {}, aliases: { player: {}, team: {} }, games: [], allFive: false };
+// Leagues where DST does not offer player tackles: the Tackles tab is not required to mark games completed.
+const NO_TACKLES = new Set(['ere', 'liber', 'lig', 'mls', 'mxa', 'mxc', 'por', 'tur']);
+const requiredTabs = () => TABS.filter(t => !(t === 'Tackles' && NO_TACKLES.has(S.league)));
+const LEAGUE_NAMES = { mls: 'MLS', laliga: 'La Liga', dfl: 'Bundesliga (DFL)', epl: 'Premier League', seriea: 'Serie A', lig: 'Ligue 1', ere: 'Eredivisie', por: 'Primeira Liga', tur: 'Süper Lig', mxa: 'Liga MX', brz: 'Brasileirão', liber: 'Libertadores', ucl: 'Champions League', eurl: 'Europa League' };
+
+function toast(msg, ms = 2500) { const t = $('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', ms); }
+async function api(path, opts = {}) {
+  const r = await fetch(path, { credentials: 'same-origin', headers: { 'content-type': 'application/json' }, ...opts, body: opts.body ? JSON.stringify(opts.body) : undefined });
+  const j = await r.json().catch(() => ({}));
+  if (r.status === 401) { showLogin(/wrong/i.test(j.error || '') ? j.error : ''); throw new Error(j.error || 'team password required'); }
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+async function gqlBatch(ops, concurrency = 8) {
+  const out = [];
+  for (let i = 0; i < ops.length; i += 200) {
+    const { results } = await api('/api/gql', { method: 'POST', body: { ops: ops.slice(i, i + 200), concurrency } });
+    out.push(...results);
+  }
+  return out;
+}
+const gqlOne = async (operationName, variables) => { const [r] = await gqlBatch([{ operationName, variables }]); if (r.error) throw new Error(r.error); return r.data; };
+const fmt = v => v == null ? '—' : String(v);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const isComplete = f => /complet/i.test(f?.progress?.status || '');
+
+// ---------- auth ----------
+function showLogin(err) {
+  $('loginCard').classList.remove('hidden');
+  for (const id of ['leagueCard', 'filesCard', 'reviewCard', 'runCard', 'mapCard', 'btnLogout', 'btnRuns', 'btnHelp', 'btnMap']) $(id).classList.add('hidden');
+  $('loginErr').textContent = err || '';
+  $('who').textContent = '';
+}
+function showApp() {
+  $('loginCard').classList.add('hidden');
+  for (const id of ['leagueCard', 'filesCard', 'btnRuns', 'btnHelp', 'btnMap']) $(id).classList.remove('hidden');
+  if (S.protected) $('btnLogout').classList.remove('hidden');
+  $('who').textContent = S.serviceUser ? `saving as ${S.serviceUser}` : '';
+}
+const traderName = () => (S.serviceUser || 'import');
+$('loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  $('loginErr').textContent = '';
+  try {
+    await api('/api/login', { method: 'POST', body: { password: $('p').value } });
+    $('p').value = '';
+    await boot();
+  } catch (err) { $('loginErr').textContent = err.message; }
+});
+$('btnLogout').onclick = async () => { await api('/api/logout', { method: 'POST' }).catch(() => {}); showLogin(''); };
+
+// ---------- leagues & fixtures ----------
+async function loadLeagues() {
+  const d = await gqlOne('UpcomingFixtures', { filter: {} });
+  const all = d.upcomingFixtures.fixtures;
+  const by = {}; for (const f of all) (by[f.leagueName] ??= []).push(f);
+  S.leagues = Object.keys(by).sort();
+  S.allFixtures = by;
+  const sel = $('league');
+  sel.innerHTML = '<option value="">— choose a league —</option>' + S.leagues.map(l => `<option value="${l}">${esc(LEAGUE_NAMES[l] || l)} (${by[l].length})</option>`).join('');
+  if (S.league && by[S.league]) { sel.value = S.league; renderFixtures(); }
+}
+$('league').onchange = () => { S.league = $('league').value; renderFixtures(); renderTabs(); };
+$('btnRefresh').onclick = () => loadLeagues().then(() => toast('Fixtures refreshed'));
+function renderFixtures() {
+  S.fixtures = (S.allFixtures?.[S.league] || []).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  $('leagueInfo').textContent = S.league ? `${S.fixtures.length} upcoming fixtures, ${S.fixtures.filter(isComplete).length} already complete` : '';
+  $('fixtures').innerHTML = S.league ? `<table><tr><th>Date</th><th>Home</th><th>Away</th><th>Status</th><th>Entered</th></tr>` +
+    S.fixtures.map(f => `<tr><td>${esc(String(f.date).slice(0, 10))}</td><td>${esc(f.homeTeam.name)}</td><td>${esc(f.awayTeam.name)}</td><td><span class="badge ${isComplete(f) ? 'complete' : ''}">${esc(f.progress.status)}</span></td><td class="num">${f.progress.enteredPlayersCount}/${f.progress.totalPlayersCount}</td></tr>`).join('') + '</table>' : '';
+}
+
+// ---------- files ----------
+const drop = $('drop');
+drop.onclick = () => $('fileInput').click();
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+drop.ondragleave = () => drop.classList.remove('over');
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); addFiles(e.dataTransfer.files); };
+$('fileInput').onchange = e => addFiles(e.target.files);
+$('btnClearFiles').onclick = () => { S.files = {}; renderTabs(); };
+async function addFiles(list) {
+  $('fileErr').textContent = '';
+  for (const f of list) {
+    try {
+      const text = await f.text();
+      const { tab, games } = parseBet365Html(text, DOMParser);
+      if (!games.length) throw new Error(`${f.name}: no games found — is this a bet365 "Webpage, Complete" save?`);
+      if (!tab) throw new Error(`${f.name}: could not tell which bet365 tab this is`);
+      S.files[tab] = { name: f.name, games };
+    } catch (e) { $('fileErr').textContent += e.message + ' '; }
+  }
+  renderTabs();
+}
+function renderTabs() {
+  const req = requiredTabs();
+  const chips = TABS.map(t => S.files[t] ? `<span class="chip ok">✓ ${t} · ${S.files[t].games.length} games</span>` : (req.includes(t) ? `<span class="chip miss">${t} — not provided</span>` : `<span class="chip miss">${t} — not used for this league</span>`)).join('');
+  const missing = req.filter(t => !S.files[t]);
+  S.allFive = missing.length === 0;
+  let note = '';
+  if (Object.keys(S.files).length && missing.length) {
+    const cols = [];
+    if (!S.files['Shots']) cols.push('Shots value and price'); if (!S.files['Shots On Target']) cols.push('0.5 SOT'); if (!S.files['Tackles'] && req.includes('Tackles')) cols.push('1.5 Tackles'); if (!S.files['Score or Assist']) cols.push('Assist and Goals'); if (!S.files['To Be Booked']) cols.push('Cards');
+    note = `<div class="muted" style="margin-top:6px">${cols.join(', ')} will be left blank; games will <b>not</b> be marked completed.</div>`;
+  }
+  $('tabs').innerHTML = chips + note;
+  $('btnMatch').disabled = !(S.league && Object.keys(S.files).length);
+}
+
+// ---------- matching (automatic) ----------
+$('btnMatch').onclick = () => {
+  $('reviewCard').classList.remove('hidden'); $('runCard').classList.add('hidden');
+  $('runNote').textContent = `${Object.keys(S.files).length} tab(s), ${S.allFive ? 'games will be marked completed' : 'games will stay open'}`;
+  $('modeNote').innerHTML = $('optOverwrite').checked ? '<b class="err">Overwrite mode:</b> values already in the app will be replaced with the bet365 values for every matched player.' : '<b>Fill-empty mode:</b> values already in the app are kept; only empty cells are filled.';
+  $('reviewCard').scrollIntoView({ behavior: 'smooth' });
+};
+async function loadAliases() {
+  S.aliases = { player: {}, team: {} };
+  try { const r = await api(`/api/aliases?league=${encodeURIComponent(S.league)}`); for (const a of r.aliases || []) S.aliases[a.kind === 'team' ? 'team' : 'player'][norm(a.bet365_name)] = a.kind === 'team' ? a.app_name : a.app_id; }
+  catch (e) { /* aliases are optional */ }
+}
+async function prepare() {
+  await loadAliases();
+  const tabs = {}; for (const [t, f] of Object.entries(S.files)) tabs[t] = f.games;
+  S.rows = buildRows(tabs);
+  S.src = {}; // raw bet365 prices per game title / player / tab, kept for the import log
+  for (const [t, games] of Object.entries(tabs)) for (const g of games) for (const [n, p] of Object.entries(g.rows)) ((S.src[g.title] ??= {})[n] ??= {})[t] = p;
+  const used = new Set();
+  S.games = Object.keys(S.rows).sort().map(title => {
+    const m = matchFixture(title, S.fixtures.filter(f => !used.has(f.id)), S.aliases.team);
+    if (m.fixture) used.add(m.fixture.id);
+    return { title, fixture: m.fixture, rows: [], onlyEmpty: !$('optOverwrite').checked, roster: null };
+  });
+  const need = S.games.filter(g => g.fixture);
+  const res = await gqlBatch(need.map(g => ({ operationName: 'GamePlayersDataEntry', variables: { gameId: g.fixture.id } })));
+  need.forEach((g, i) => {
+    if (res[i].error) { g.rosterError = res[i].error; return; }
+    const d = res[i].data.gamePlayersDataEntry;
+    g.roster = [...d.homeTeamPlayers, ...d.awayTeamPlayers];
+    const r = makeResolver(g.roster, S.aliases.player);
+    g.rows = Object.entries(S.rows[g.title]).map(([name, vals]) => {
+      let [entries, how] = r.resolve(name);
+      if (how.startsWith('fuzzy')) { entries = null; how = 'none'; } // only exact / token / alias are trusted
+      return { name, vals, entries, how, skip: !entries };
+    });
+  });
+}
+
+// ---------- run ----------
+$('btnRun').onclick = async () => {
+  $('btnRun').disabled = true;
+  try { await runImport(); } catch (e) { toast('Error: ' + e.message, 8000); console.error(e); }
+  $('btnRun').disabled = false;
+};
+async function runImport() {
+  $('runCard').classList.remove('hidden'); $('report').innerHTML = ''; $('prog').value = 0; $('prog').max = 1;
+  $('runStatus').textContent = 'Matching games and players…';
+  $('runCard').scrollIntoView({ behavior: 'smooth' });
+  await prepare();
+  const games = S.games.filter(g => g.fixture && g.roster);
+  const markComplete = S.allFive;
+  $('prog').max = games.length;
+  const report = []; const logRows = [];
+  for (const g of S.games.filter(g => !g.fixture || g.rosterError)) report.push({ game: g.title, title: g.title, matched: 0, unchanged: 0, saved: 0, errors: [g.rosterError || 'no matching fixture in the app — skipped'], verifyOk: 0, mismatches: [], completed: false, skipped: [], dupes: [], outOfRange: 0 });
+  for (const g of games) {
+    const rep = { game: `${g.fixture.homeTeam.name} v ${g.fixture.awayTeam.name}`, title: g.title, matched: 0, unchanged: 0, saved: 0, errors: [], verifyOk: 0, mismatches: [], completed: false, skipped: g.rows.filter(r => r.skip && r.how !== 'ignored').map(r => r.name), dupes: [], outOfRange: 0 };
+    $('runStatus').textContent = `Saving ${rep.game}…`;
+    const inputs = [];
+    for (const r of g.rows) {
+      if (r.skip || !r.entries) { logRows.push({ game: rep.game, bet365: r.name, player: null, team: null, how: r.how, values: r.vals, before: null, src: S.src[g.title]?.[r.name] || null, action: r.how === 'ignored' ? 'ignored' : 'skipped' }); continue; }
+      rep.matched++;
+      if (r.entries.length > 1) rep.dupes.push(r.entries[0].player.name);
+      for (const p of r.entries) {
+        const input = { gameId: g.fixture.id, playerId: p.player.id };
+        FIELDS.forEach((f, i) => { let v = r.vals[i]; if (g.onlyEmpty && p[f] != null) v = p[f]; input[f] = v == null ? null : Number(v); });
+        const logRow = { game: rep.game, bet365: r.name, player: p.player.name, team: p.team.abbreviation, how: r.how, values: FIELDS.map(f => input[f]), before: FIELDS.map(f => p[f] ?? null), src: S.src[g.title]?.[r.name] || null, action: 'saved' };
+        logRows.push(logRow);
+        if (FIELDS.every(f => same(p[f], input[f]))) { rep.unchanged++; logRow.action = 'unchanged'; continue; }
+        if ((input.assistPrice ?? 0) > 20 || (input.goals ?? 0) > 20 || (input.cards ?? 0) > 20) rep.outOfRange++;
+        inputs.push({ input, name: p.player.name });
+      }
+    }
+    if (inputs.length) {
+      const res = await gqlBatch(inputs.map(x => ({ operationName: 'SavePlayerMarket', variables: { input: x.input } })));
+      res.forEach((x, i) => { if (x.error) { rep.errors.push(`${inputs[i].name}: ${x.error}`); const lr = logRows.find(l => l.game === rep.game && l.player === inputs[i].name && l.action === 'saved'); if (lr) lr.action = 'error'; } else rep.saved++; });
+      // verify by re-reading
+      const d = await gqlOne('GamePlayersDataEntry', { gameId: g.fixture.id });
+      const cur = {}; for (const p of [...d.gamePlayersDataEntry.homeTeamPlayers, ...d.gamePlayersDataEntry.awayTeamPlayers]) cur[p.player.id] = p;
+      for (const x of inputs) {
+        const p = cur[x.input.playerId];
+        const diffs = FIELDS.filter(f => !same(p?.[f], x.input[f]));
+        if (diffs.length) rep.mismatches.push(`${x.name}: ${diffs.join(', ')}`); else rep.verifyOk++;
+      }
+    }
+    if (markComplete && !rep.errors.length && !rep.mismatches.length) {
+      try { await gqlOne('MarkFixtureCompleted', { gameId: g.fixture.id, completed: true }); rep.completed = true; }
+      catch (e) { rep.errors.push('mark completed: ' + e.message); }
+    }
+    report.push(rep);
+    $('prog').value = report.length;
+    renderReport(report, false);
+  }
+  $('runStatus').textContent = `Done — ${report.reduce((a, r) => a + r.saved, 0)} rows saved across ${games.length} games${markComplete ? ', games marked completed' : ' (games left open: not all required tabs provided)'}.`;
+  renderReport(report, true);
+  api('/api/runs', { method: 'POST', body: { league: S.league, username: traderName(), summary: { tabs: Object.keys(S.files), overwrite: $('optOverwrite').checked, games: report.map(r => ({ game: r.game, matched: r.matched, saved: r.saved, unchanged: r.unchanged, verifyOk: r.verifyOk, mismatches: r.mismatches.length, errors: r.errors.length, completed: r.completed, skipped: r.skipped.length })) }, detail: { tabs: Object.keys(S.files), overwrite: $('optOverwrite').checked, fields: FIELDS, rows: logRows } } }).catch(() => {});
+  loadLeagues().catch(() => {});
+  // remember unmatched names for the Name Mapping page
+  const items = [];
+  for (const g of games) for (const r of g.rows) if (r.skip && r.how !== 'ignored') items.push({ name: r.name, gameId: g.fixture.id, game: `${g.fixture.homeTeam.name} v ${g.fixture.awayTeam.name}` });
+  if (items.length) api('/api/unmatched', { method: 'POST', body: { league: S.league, items } }).catch(() => {});
+}
+function renderReport(report, done) {
+  $('report').innerHTML = `<table><tr><th>Game</th><th>Matched</th><th>Saved</th><th>Unchanged</th><th>Verified</th><th>Mismatch</th><th>Errors</th><th>Completed</th><th>Skipped names</th></tr>` +
+    report.map(r => `<tr><td>${esc(r.game)}</td><td class="num">${r.matched}</td><td class="num">${r.saved}</td><td class="num">${r.unchanged}</td><td class="num ${r.mismatches.length ? 'err' : 'ok'}">${r.verifyOk}</td><td class="num ${r.mismatches.length ? 'err' : ''}">${r.mismatches.length}</td><td class="num ${r.errors.length ? 'err' : ''}">${r.errors.length}</td><td>${r.completed ? '<span class="ok">✓</span>' : '—'}</td><td style="white-space:normal" class="muted">${esc(r.skipped.join(', '))}${r.dupes.length ? ` <i>(dupes filled: ${esc(r.dupes.join(', '))})</i>` : ''}</td></tr>` +
+      (r.errors.length || r.mismatches.length ? `<tr><td colspan="9" class="err" style="white-space:normal">${esc([...r.errors, ...r.mismatches].join(' · '))}</td></tr>` : '')).join('') + '</table>' +
+    (done ? `<p class="muted">Out-of-range prices (over 20) accepted: ${report.reduce((a, r) => a + r.outOfRange, 0)}.</p>` : '');
+}
+
+// ---------- name mapping page ----------
+const M = { league: '', items: [], aliases: [], rosters: {} };
+$('btnMap').onclick = async () => {
+  $('mapLeague').innerHTML = S.leagues.map(l => `<option value="${l}" ${l === (S.league || M.league) ? 'selected' : ''}>${esc(LEAGUE_NAMES[l] || l)}</option>`).join('');
+  M.league = $('mapLeague').value;
+  $('mapCard').classList.remove('hidden'); $('mapCard').scrollIntoView({ behavior: 'smooth' });
+  await loadMapping();
+};
+$('btnMapClose').onclick = () => $('mapCard').classList.add('hidden');
+$('mapLeague').onchange = async () => { M.league = $('mapLeague').value; await loadMapping(); };
+async function loadMapping() {
+  $('mapUnmatched').innerHTML = '<p class="muted">loading…</p>'; $('mapExisting').innerHTML = '';
+  try {
+    const [u, a] = await Promise.all([api(`/api/unmatched?league=${encodeURIComponent(M.league)}`), api(`/api/aliases?league=${encodeURIComponent(M.league)}`)]);
+    M.aliases = (a.aliases || []).filter(x => x.kind === 'player');
+    const mapped = new Set(M.aliases.map(x => norm(x.bet365_name)));
+    M.items = (u.items || []).filter(x => !mapped.has(norm(x.name)));
+    // rosters for the games the unmatched names were seen in
+    const gameIds = [...new Set(M.items.map(x => x.gameId).filter(Boolean))].filter(id => !M.rosters[id]);
+    if (gameIds.length) {
+      const res = await gqlBatch(gameIds.map(id => ({ operationName: 'GamePlayersDataEntry', variables: { gameId: id } })));
+      gameIds.forEach((id, i) => { if (!res[i].error) { const d = res[i].data.gamePlayersDataEntry; M.rosters[id] = [...d.homeTeamPlayers, ...d.awayTeamPlayers].map(p => ({ id: p.player.id, name: p.player.name, team: p.team.abbreviation, active: p.player.isActive })).sort((x, y) => x.team.localeCompare(y.team) || x.name.localeCompare(y.name)); } });
+    }
+    renderMapping();
+  } catch (e) { $('mapUnmatched').innerHTML = `<p class="err">${esc(e.message)}</p>`; }
+}
+function renderMapping() {
+  $('mapInfo').textContent = `${M.items.length} unmatched, ${M.aliases.length} mapped`;
+  $('mapUnmatched').innerHTML = M.items.length ? `<table><tr><th>bet365 name</th><th>seen in</th><th>data-entry player</th></tr>` + M.items.map((it, i) => {
+    const roster = M.rosters[it.gameId] || [];
+    const opts = `<option value="">— choose —</option><option value="IGNORE">— ignore (not in app) —</option>` + roster.map(p => `<option value="${p.id}" data-name="${esc(p.name)}">${esc(p.name)} (${esc(p.team)}${p.active ? '' : ', inactive'})</option>`).join('');
+    return `<tr><td>${esc(it.name)}</td><td class="muted">${esc(it.game || '')}</td><td><select class="mapsel" data-i="${i}">${opts}</select></td></tr>`;
+  }).join('') + '</table>' : '<p class="muted">Nothing to map — every name in recent imports matched or is already mapped.</p>';
+  $('mapExisting').innerHTML = M.aliases.length ? `<table><tr><th>bet365 name</th><th>data-entry player</th><th></th></tr>` + M.aliases.map((a, i) => `<tr><td>${esc(a.bet365_name)}</td><td>${a.app_id === 'IGNORE' ? '<i class="muted">ignored</i>' : esc(a.app_name || a.app_id)}</td><td><button class="mapdel" data-i="${i}">remove</button></td></tr>`).join('') + '</table>' : '<p class="muted">No mappings yet.</p>';
+  for (const el of document.querySelectorAll('.mapsel')) el.onchange = onMapPick;
+  for (const el of document.querySelectorAll('.mapdel')) el.onclick = onMapRemove;
+}
+async function onMapPick(e) {
+  const it = M.items[+e.target.dataset.i]; const id = e.target.value; if (!id) return;
+  const opt = e.target.selectedOptions[0]; const appName = id === 'IGNORE' ? null : opt.dataset.name;
+  e.target.disabled = true;
+  try {
+    await api('/api/aliases', { method: 'POST', body: { league: M.league, kind: 'player', bet365Name: it.name, appId: id, appName, createdBy: traderName() } });
+    await api('/api/unmatched', { method: 'DELETE', body: { league: M.league, names: [it.name] } });
+    M.aliases.push({ kind: 'player', bet365_name: it.name, app_id: id, app_name: appName });
+    M.items.splice(+e.target.dataset.i, 1);
+    toast(id === 'IGNORE' ? `${it.name} will be ignored` : `${it.name} → ${appName}`);
+    renderMapping();
+  } catch (err) { e.target.disabled = false; toast('Not saved: ' + err.message, 6000); }
+}
+async function onMapRemove(e) {
+  const a = M.aliases[+e.target.dataset.i];
+  try {
+    await api('/api/aliases', { method: 'DELETE', body: { league: M.league, kind: 'player', bet365Name: a.bet365_name } });
+    M.aliases.splice(+e.target.dataset.i, 1); renderMapping();
+  } catch (err) { toast('Not removed: ' + err.message, 6000); }
+}
+
+// ---------- recent runs ----------
+$('btnRuns').onclick = async () => {
+  $('findLeague').innerHTML = '<option value="">all leagues</option>' + S.leagues.map(l => `<option value="${l}">${esc(LEAGUE_NAMES[l] || l)}</option>`).join('');
+  const { runs } = await api('/api/runs');
+  $('runsList').innerHTML = runs.length ? `<table><tr><th>When</th><th>League</th><th>User</th><th>Games</th><th>Saved</th><th>Completed</th></tr>` + runs.map(r => {
+    const g = r.summary?.games || [];
+    return `<tr><td>${esc(new Date(r.created_at).toLocaleString())}</td><td>${esc(LEAGUE_NAMES[r.league] || r.league)}</td><td>${esc(r.username)}</td><td class="num">${g.length}</td><td class="num">${g.reduce((a, x) => a + (x.saved || 0), 0)}</td><td class="num">${g.filter(x => x.completed).length}</td></tr>`;
+  }).join('') + '</table>' : '<p class="muted">No imports yet.</p>';
+  $('runsCard').classList.remove('hidden'); $('runsCard').scrollIntoView({ behavior: 'smooth' });
+};
+$('btnRunsClose').onclick = () => $('runsCard').classList.add('hidden');
+$('btnFind').onclick = findPlayer;
+$('findName').onkeydown = e => { if (e.key === 'Enter') findPlayer(); };
+async function findPlayer() {
+  const q = $('findName').value.trim(); if (!q) return;
+  $('findLeague').innerHTML = '<option value="">all leagues</option>' + S.leagues.map(l => `<option value="${l}" ${$('findLeague').value === l ? 'selected' : ''}>${esc(LEAGUE_NAMES[l] || l)}</option>`).join('');
+  $('findInfo').textContent = 'searching…'; $('findResults').innerHTML = '';
+  try {
+    const { hits } = await api(`/api/runs?q=${encodeURIComponent(q)}&league=${encodeURIComponent($('findLeague').value)}`);
+    $('findInfo').textContent = `${hits.length} row(s) in the last 40 uploads`;
+    const srcText = src => src ? Object.entries(src).map(([t, p]) => `${t}: ${p.map(fmt).join(' / ')}`).join(' · ') : '';
+    $('findResults').innerHTML = hits.length ? `<table><tr><th>When</th><th>League</th><th>Game</th><th>bet365 → app player</th><th>Action</th>${FIELD_LABELS.map(l => `<th style="text-align:right">${l}</th>`).join('')}<th>bet365 source prices</th></tr>` +
+      hits.map(h => `<tr><td>${esc(new Date(h.at).toLocaleString())}</td><td>${esc(LEAGUE_NAMES[h.league] || h.league)}</td><td>${esc(h.game)}</td><td>${esc(h.bet365)}${h.player ? ' → ' + esc(h.player) + ' (' + esc(h.team) + ')' : ''}</td><td class="${h.action === 'saved' ? 'ok' : h.action === 'error' ? 'err' : 'muted'}">${esc(h.action)}</td>${(h.values || []).map(v => `<td class="num">${fmt(v)}</td>`).join('')}<td class="muted" style="white-space:normal;font-size:12px">${esc(srcText(h.src))}</td></tr>`).join('') + '</table>' : '<p class="muted">No rows found.</p>';
+  } catch (e) { $('findInfo').textContent = e.message; }
+}
+
+// ---------- boot ----------
+async function boot() {
+  try {
+    const me = await api('/api/me');
+    S.protected = me.protected; S.serviceUser = me.serviceUser;
+    showApp(); await loadLeagues();
+  } catch (e) {
+    if (!/log in|password/i.test(e.message)) toast(e.message, 10000);
+  }
+}
+boot();
+</script>
+</body>
+</html>
